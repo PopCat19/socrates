@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, ClassVar
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Footer, Header, Input, Static, TextArea
+from textual.widgets import Footer, Header, Input, Select, Static, TextArea
 
 if TYPE_CHECKING:
     from textual.timer import Timer
@@ -60,6 +60,7 @@ class SocratesApp(App):
     #body { layout: horizontal; height: 1fr; }
     #left { layout: vertical; width: 1fr; }
     TextArea { height: 8; }
+    .hidden { display: none; }
     """
 
     def __init__(self) -> None:
@@ -71,7 +72,8 @@ class SocratesApp(App):
     def compose(self) -> ComposeResult:
         yield Header()
         with Horizontal(id="top"):
-            yield Input(placeholder="Model name", id="model-input", value=self.model)
+            yield Select([], prompt="Loading models…", id="model-select")
+            yield Input(placeholder="Model name", id="model-input", classes="hidden")
         with Horizontal(id="body"):
             with Vertical(id="left"):
                 yield TextArea(id="prompt")
@@ -81,11 +83,17 @@ class SocratesApp(App):
 
     async def on_mount(self) -> None:
         models = await self.llm.list_models()
-        inp = self.query_one("#model-input", Input)
         if models:
             self.model = models[0]
-            inp.value = self.model
-            inp.placeholder = f"Model ({', '.join(models[:3])}…)"
+            sel = self.query_one("#model-select", Select)
+            sel.set_options((m, m) for m in models)
+        else:
+            self.query_one("#model-select", Select).add_class("hidden")
+            self.query_one("#model-input", Input).remove_class("hidden")
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id == "model-select" and event.value:
+            self.model = str(event.value)
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == "model-input" and event.value.strip():
