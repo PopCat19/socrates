@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<!--
+  index.html
+
+  Purpose: Socrates web UI — prompt assistant with clarifying questions and extended reasoning
+
+  This module:
+  - Provides split-pane layout with prompt input, questions, and response panels
+  - Applies PMD design system styling (Base16 colors, rem units, rounded cards)
+  - Supports mobile responsive layout with collapsible sidebar
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socrates</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Rounded+Mplus+1c:wght@500;700&family=Fira+Code:wght@300..700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --base00: #161219;
+            --base01: #1e1a22;
+            --base02: #2a2530;
+            --base03: #4a3f56;
+            --base04: #9B7EB5;
+            --base05: #C49EDD;
+            --base06: #DBBFEC;
+            --base07: #FFFFFF;
+            --base08: #DBBFEC;
+            --base09: #B58CA3;
+            --base0A: #DDB8C4;
+            --base0B: #7EB59B;
+            --base0C: #B8DDCE;
+            --base0D: #9B7EB5;
+            --base0E: #7E9BB5;
+            --base0F: #8A7298;
+            --sidebar-width: 320px;
+            --header-height: 3.5rem;
+        }
+
+        body {
+            font-family: 'Fredoka', 'Rounded Mplus 1c', system-ui, sans-serif;
+            font-weight: 500;
+            background: var(--base00);
+            color: var(--base05);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        body.no-scroll {
+            overflow: hidden;
+            overscroll-behavior: none;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: var(--sidebar-width) 1fr;
+            min-height: 100vh;
+        }
+
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--header-height);
+            background: var(--base01);
+            border-bottom: 0.125rem solid var(--base02);
+            padding: 0 1rem;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: var(--base06);
+        }
+
+        .logo span {
+            font-weight: 400;
+            color: var(--base05);
+        }
+
+        .mobile-header .logo { font-size: 1.25rem; }
+
+        .menu-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 2.5rem;
+            height: 2.5rem;
+            background: var(--base02);
+            border: 0.125rem solid var(--base03);
+            border-radius: 1rem;
+            color: var(--base05);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .menu-btn:hover, .menu-btn:active {
+            background: var(--base03);
+            border-color: var(--base04);
+        }
+
+        .menu-btn:active {
+            transform: scale(0.95);
+        }
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 150;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .sidebar-overlay.show { opacity: 1; }
+
+        .sidebar {
+            background: var(--base01);
+            border-right: 0.125rem solid var(--base02);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            overflow-y: auto;
+            max-height: 100vh;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .control-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--base06);
+        }
+
+        .model-selector, .model-input {
+            padding: 0.625rem 0.75rem;
+            background: var(--base02);
+            border: 0.125rem solid var(--base03);
+            border-radius: 1rem;
+            color: var(--base05);
+            font-size: 0.875rem;
+            font-family: 'Fira Code', monospace;
+        }
+
+        .model-selector:focus, .model-input:focus {
+            outline: none;
+            border-color: var(--base06);
+        }
+
+        .model-selector {
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .model-input {
+            width: 100%;
+        }
+
+        .keybind-hint {
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+            font-size: 0.625rem;
+            color: var(--base04);
+        }
+
+        .keybind-hint kbd {
+            font-family: 'Fira Code', monospace;
+            background: var(--base02);
+            padding: 0.125rem 0.25rem;
+            border-radius: 0.25rem;
+            border: 0.0625rem solid var(--base03);
+        }
+
+        .main {
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr var(--sidebar-width);
+            grid-template-rows: 1fr 1fr;
+            gap: 0.75rem;
+            min-height: calc(100vh - 3rem);
+        }
+
+        .panel {
+            background: var(--base01);
+            border: 0.125rem solid var(--base02);
+            border-radius: 1rem;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            padding: 0.75rem 1rem;
+            border-bottom: 0.125rem solid var(--base02);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .panel-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--base06);
+        }
+
+        .panel-title::after {
+            content: '';
+            flex: 1;
+            height: 0.125rem;
+            background: var(--base02);
+        }
+
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        #prompt-panel {
+            grid-column: 1;
+            grid-row: 1;
+        }
+
+        #prompt {
+            width: 100%;
+            height: 100%;
+            min-height: 12rem;
+            background: transparent;
+            border: none;
+            color: var(--base05);
+            font-family: 'Fredoka', 'Rounded Mplus 1c', system-ui, sans-serif;
+            font-size: 0.875rem;
+            line-height: 1.6;
+            resize: none;
+            outline: none;
+        }
+
+        #prompt::placeholder {
+            color: var(--base03);
+        }
+
+        #response-panel {
+            grid-column: 1;
+            grid-row: 2;
+        }
+
+        #response {
+            white-space: pre-wrap;
+            font-size: 0.8125rem;
+            line-height: 1.6;
+            color: var(--base05);
+        }
+
+        #response.streaming {
+            border-color: var(--base04);
+        }
+
+        #questions-panel {
+            grid-column: 2;
+            grid-row: 1 / 3;
+        }
+
+        #questions {
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+
+        .question {
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            background: var(--base02);
+            border-radius: 1rem;
+            border: 0.125rem solid transparent;
+            transition: all 0.15s;
+        }
+
+        .question:hover {
+            border-color: var(--base04);
+        }
+
+        .question:last-child {
+            margin-bottom: 0;
+        }
+
+        .priority {
+            display: inline-block;
+            font-size: 0.625rem;
+            font-weight: 700;
+            padding: 0.125rem 0.375rem;
+            border-radius: 0.5rem;
+            margin-right: 0.5rem;
+            font-family: 'Fira Code', monospace;
+        }
+
+        .priority-P0 {
+            background: var(--base08);
+            color: var(--base00);
+        }
+
+        .priority-P1 {
+            background: var(--base0A);
+            color: var(--base00);
+        }
+
+        .priority-P2 {
+            background: var(--base0B);
+            color: var(--base00);
+        }
+
+        .question-text {
+            color: var(--base05);
+        }
+
+        .hint {
+            color: var(--base03);
+            font-size: 0.85rem;
+        }
+
+        .fab {
+            display: none;
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            width: 3.5rem;
+            height: 3.5rem;
+            border-radius: 50%;
+            background: var(--base06);
+            color: var(--base00);
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 90;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+
+        .fab:hover, .fab:active {
+            transform: scale(1.1);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+        }
+
+        .fab:active {
+            transform: scale(0.95);
+        }
+
+        footer {
+            font-size: 0.625rem;
+            color: var(--base03);
+            text-align: center;
+            padding: 0.75rem;
+        }
+
+        @media (max-width: 900px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            .mobile-header {
+                display: flex;
+            }
+
+            .sidebar-overlay {
+                display: block;
+                pointer-events: none;
+            }
+
+            .sidebar-overlay.show {
+                pointer-events: auto;
+            }
+
+            .sidebar {
+                position: fixed;
+                top: var(--header-height);
+                right: 0;
+                bottom: 0;
+                width: var(--sidebar-width);
+                max-width: 85vw;
+                z-index: 200;
+                transform: translateX(100%);
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                padding-top: 1rem;
+                border-left: 0.125rem solid var(--base02);
+                border-right: none;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .main {
+                margin-top: var(--header-height);
+                padding: 1rem;
+                padding-bottom: 5rem;
+            }
+
+            .main-grid {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto;
+            }
+
+            #prompt-panel {
+                grid-column: 1;
+                grid-row: 1;
+            }
+
+            #prompt {
+                min-height: 8rem;
+            }
+
+            #questions-panel {
+                grid-column: 1;
+                grid-row: 2;
+            }
+
+            #response-panel {
+                grid-column: 1;
+                grid-row: 3;
+            }
+
+            .fab {
+                display: flex;
+            }
+
+            .keybind-hint {
+                display: none;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .panel-header {
+                padding: 0.5rem 0.75rem;
+            }
+
+            .panel-content {
+                padding: 0.75rem;
+            }
+
+            .panel-title {
+                font-size: 0.6875rem;
+            }
+
+            #prompt {
+                font-size: 0.8125rem;
+            }
+
+            #response {
+                font-size: 0.75rem;
+            }
+
+            .question {
+                padding: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <header class="mobile-header">
+        <div class="logo">Socrates</div>
+        <button type="button" class="menu-btn" id="menuBtn" aria-label="Toggle menu">
+            ☰
+        </button>
+    </header>
+
+    <div class="layout">
+        <aside class="sidebar" id="sidebar">
+            <div class="logo">Socrates</div>
+
+            <div class="control-group">
+                <label class="control-label">Model</label>
+                <select id="model-selector" class="model-selector" style="display: none"></select>
+                <input id="model-input" class="model-input" type="text" placeholder="Model name…" />
+            </div>
+
+            <div class="control-group">
+                <div class="keybind-hint">
+                    <span>Ctrl+Enter for extended reasoning</span>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main">
+            <div class="main-grid">
+                <div class="panel" id="prompt-panel">
+                    <div class="panel-header">
+                        <span class="panel-title">Prompt</span>
+                    </div>
+                    <div class="panel-content">
+                        <textarea id="prompt" placeholder="Enter your prompt… (Ctrl+Enter for extended reasoning)"></textarea>
+                    </div>
+                </div>
+
+                <div class="panel" id="questions-panel">
+                    <div class="panel-header">
+                        <span class="panel-title">Clarifying Questions</span>
+                    </div>
+                    <div class="panel-content">
+                        <div id="questions">
+                            <span class="hint">Start typing to see clarifying questions…</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel" id="response-panel">
+                    <div class="panel-header">
+                        <span class="panel-title">Extended Reasoning</span>
+                    </div>
+                    <div class="panel-content">
+                        <div id="response"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <button type="button" class="fab" id="fabBtn" aria-label="Quick submit">
+        ⏎
+    </button>
+
+    <footer>Ctrl+Enter — extended reasoning · questions update as you type</footer>
+
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
