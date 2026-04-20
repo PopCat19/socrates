@@ -53,10 +53,15 @@ VERSION="0.1.0"
 export SKIP_CONFIRM=false
 
 # Source modules
+# shellcheck disable=SC1091
 source "${SRC_DIR}/lib.sh"
+# shellcheck disable=SC1091
 source "${SRC_DIR}/merge.sh"
+# shellcheck disable=SC1091
 source "${SRC_DIR}/changelog.sh"
+# shellcheck disable=SC1091
 source "${SRC_DIR}/sync.sh"
+# shellcheck disable=SC1091
 source "${SRC_DIR}/lint.sh"
 
 # Show main help
@@ -141,6 +146,8 @@ Options:
   --dry-run          Show what would be downloaded without writing
   --no-commit        Skip auto-commit (only stage updated files)
   --push             Auto-push after commit (default: false)
+  --consolidate      Consolidate linear subsequent dev-convention commits
+  --yes, -y          Skip confirmation (allows force-with-lease on consolidation)
   --help             Show this help message
 
 Examples:
@@ -219,6 +226,12 @@ main_tui() {
 
 # Main entrypoint
 main() {
+	# Always run from PROJECT_ROOT to ensure consistent path handling
+	cd "$PROJECT_ROOT" || {
+		echo "Error: Could not change to project root $PROJECT_ROOT" >&2
+		exit 1
+	}
+
 	# If no arguments, check for gum and launch TUI
 	if [[ $# -eq 0 ]]; then
 		if command_exists gum; then
