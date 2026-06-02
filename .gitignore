@@ -5,3 +5,7 @@ __pycache__/
 dist/
 web/dist/
 node_modules/
+
+# Command Code agent local data (taste, session logs)
+.commandcode/
+/pi-session-*.html
